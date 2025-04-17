@@ -2,15 +2,6 @@
   "name": "windborn-challenge",
   "version": "0.1.0",
   "private": true,
-  "proxy": {
-    "/api": {
-      "target": "https://a.windbornesystems.com",
-      "changeOrigin": true,
-      "pathRewrite": {
-        "^/api": ""
-      }
-    }
-  },
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -45,5 +36,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "http-proxy-middleware": "^3.0.5"
   }
 }
