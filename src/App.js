@@ -46,11 +46,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 async function fetchHourlyData(hour, allBalloonHistories) {
   const hourString = hour.toString().padStart(2, "0");
   
-  const API_BASE_URL = process.env.NODE_ENV === 'production' 
-    ? 'https://a.windbornesystems.com' 
-    : '';
-    
-  const url = `${API_BASE_URL}/treasure/${hourString}.json`;
+  const url = `/api/treasure/${hourString}.json`; 
   
   const isCurrentHour = hour === 0;
   const fetchTimeout = isCurrentHour ? 20000 : 10000;
@@ -159,7 +155,6 @@ async function fetchAndProcessBalloonData(setBalloons, setLoading, setError, set
 
     const processedBalloons = validBalloons.map(b => ({ ...b, maxDistance }));
 
-    console.log(`Processed ${processedBalloons.length} balloons. Max distance: ${maxDistance.toFixed(0)} km.`);
     setBalloons(processedBalloons);
     setLastRefreshed(new Date());
 
@@ -174,7 +169,6 @@ async function fetchAndProcessBalloonData(setBalloons, setLoading, setError, set
     setBalloons([]);
   } finally {
     setLoading(false);
-    console.log("Finished fetching balloon data.");
   }
 }
 
