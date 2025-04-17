@@ -45,7 +45,13 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
  */
 async function fetchHourlyData(hour, allBalloonHistories) {
   const hourString = hour.toString().padStart(2, "0");
-  const url = `/treasure/${hourString}.json`;
+  
+  const API_BASE_URL = process.env.NODE_ENV === 'production' 
+    ? 'https://a.windbornesystems.com' 
+    : '';
+    
+  const url = `${API_BASE_URL}/treasure/${hourString}.json`;
+  
   const isCurrentHour = hour === 0;
   const fetchTimeout = isCurrentHour ? 20000 : 10000;
 
