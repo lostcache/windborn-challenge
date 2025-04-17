@@ -1,7 +1,179 @@
 .App {
   text-align: center;
+  position: relative;
 }
 
+/* Map styles */
+.map-container {
+  position: relative;
+}
+
+.reset-view-button {
+  position: absolute;
+  top: 80px;
+  right: 10px;
+  z-index: 1000;
+  background-color: white;
+  border-radius: 4px;
+  padding: 6px 10px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.reset-view-button:hover {
+  background-color: #f4f4f4;
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  padding: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.loading-spinner::before {
+  content: '';
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px solid #ccc;
+  border-top-color: #3498db;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error message */
+.error-message {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #ff6b6b;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 4px;
+  z-index: 1000;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Info panel */
+.info-panel {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background-color: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  text-align: left;
+  max-width: 300px;
+  overflow: auto;
+  max-height: calc(100vh - 100px);
+}
+
+.info-panel h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+}
+
+.info-panel .last-refreshed {
+  font-size: 0.9rem;
+  color: #666;
+  margin-top: 8px;
+}
+
+.info-panel .data-note {
+  font-size: 0.8rem;
+  color: #888;
+  font-style: italic;
+  margin-top: 5px;
+}
+
+/* Time filter styles */
+.time-filter {
+  margin: 10px 0;
+}
+
+.time-filter label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.time-filter input {
+  width: 100%;
+  margin-top: 5px;
+}
+
+/* Path direction marker */
+.path-start-marker {
+  color: #000;
+  font-size: 14px;
+  text-shadow: 1px 1px 2px #fff, -1px -1px 2px #fff, 1px -1px 2px #fff, -1px 1px 2px #fff;
+  text-align: center;
+  line-height: 20px;
+  font-weight: bold;
+}
+
+/* Balloon popup styling */
+.balloon-popup h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #2c3e50;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.balloon-popup p {
+  margin: 5px 0;
+  font-size: 0.9rem;
+}
+
+.balloon-popup p:last-child {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-bottom: 0;
+}
+
+.balloon-popup .timestamp {
+  font-family: monospace;
+  color: #34495e;
+  word-break: break-word;
+}
+
+/* Legacy styles kept for reference */
 .App-logo {
   height: 40vmin;
   pointer-events: none;
