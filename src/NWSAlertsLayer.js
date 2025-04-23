@@ -2,6 +2,30 @@ import React from 'react';
 import { Polygon, Popup } from 'react-leaflet';
 
 /**
+ * Get color based on alert severity
+ * @param {string} severity - The alert severity level
+ * @returns {object} - The path options for styling
+ */
+function getSeverityStyle(severity) {
+  if (!severity) return { className: 'alert-unknown' };
+  
+  const severityLower = severity.toLowerCase();
+  
+  if (severityLower === 'extreme') {
+    return { className: 'alert-extreme' };
+  } else if (severityLower === 'severe') {
+    return { className: 'alert-severe' };
+  } else if (severityLower === 'moderate') {
+    return { className: 'alert-moderate' };
+  } else if (severityLower === 'minor') {
+    return { className: 'alert-minor' };
+  } else {
+    // Default to moderate for any other severity
+    return { className: 'alert-moderate' };
+  }
+}
+
+/**
  * Renders NWS alert polygons directly on the map.
  * @param {{ allAlerts: object }} props - Expects allAlerts to be the NWS FeatureCollection.
  */
@@ -48,13 +72,8 @@ function NWSAlertsLayer({ allAlerts }) {
         const alertProps = feature.properties || {};
         const alertId = alertProps.id || `feature-${Math.random()}`; // Use ID or generate fallback key
 
-        // Define visual style for the alert polygon
-        const pathOptions = {
-          fillColor: 'orange',
-          fillOpacity: 0.2,
-          color: 'red', // Border color
-          weight: 1,
-        };
+        // Use severity to determine styling
+        const pathOptions = getSeverityStyle(alertProps.severity);
 
         return (
           <Polygon key={alertId} pathOptions={pathOptions} positions={leafletPositions}>

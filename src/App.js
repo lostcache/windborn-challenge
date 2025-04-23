@@ -347,66 +347,80 @@ function MapController() {
 function BalloonMarker({ balloon, markerColor, alerts }) {
   if (!balloon.currentPosition) return null;
 
-  if(alerts) {
-      console.log(`BalloonMarker (${balloon.id}): Received alerts prop:`, alerts);
-  }
-
   // Check if the passed 'alerts' prop (which is now an array of NWS properties) is non-empty
   const hasAlerts = alerts && Array.isArray(alerts) && alerts.length > 0;
   const alertColor = 'orange';
   const finalMarkerColor = hasAlerts ? alertColor : markerColor;
-  const markerRadius = hasAlerts ? 7 : 5;
+  
+  // Improved marker style with better visibility
+  const markerRadius = hasAlerts ? 9 : 7; // Increased size
+  const pathOptions = {
+    color: '#000', // Black border for contrast
+    weight: 2, // Thicker border
+    fillColor: finalMarkerColor,
+    fillOpacity: 0.9, // More opaque fill
+    opacity: 1
+  };
 
   if(hasAlerts) {
-      console.log(`BalloonMarker (${balloon.id}): Rendering WITH alert indicators.`);
+    console.log(`BalloonMarker (${balloon.id}): Rendering WITH alert indicators.`);
   }
 
-  return (
-    <CircleMarker
-      center={[balloon.currentPosition.lat, balloon.currentPosition.lon]}
-      pathOptions={{
-        color: finalMarkerColor,
-        fillColor: finalMarkerColor,
-        fillOpacity: 0.8,
-        weight: 1
-      }}
-      radius={markerRadius}
-      key={balloon.id}
-    >
-      <Popup>
-        <div className="balloon-popup">
-          {/* Balloon Info */}
-          <h3>Balloon #{balloon.id} {hasAlerts ? '⚠️' : ''}</h3>
-          <p>Lat: {balloon.currentPosition.lat.toFixed(4)}</p>
-          <p>Lon: {balloon.currentPosition.lon.toFixed(4)}</p>
-          <p>Alt: {balloon.currentPosition.alt?.toFixed(2) ?? 'N/A'} km</p>
-          <p>FL: {Math.max(0, Math.round((balloon.currentPosition.alt * 328.084))).toString().padStart(3, "0") ?? 'N/A'}</p>
-          <p>Dist (24h): {balloon.totalDistance ? balloon.totalDistance.toFixed(0) : 'N/A'} km</p>
-          <p>
-            Last updated: <br />
-            <span className="timestamp">{balloon.currentPosition.timestamp?.toLocaleString() ?? 'N/A'}</span>
-          </p>
+  // Use a custom icon for better visibility
+  const balloonIcon = L.divIcon({
+    html: `<div style="
+      background-color: ${finalMarkerColor}; 
+      border: 2px solid #000; 
+      border-radius: 50%; 
+      width: 100%; 
+      height: 100%;
+      box-shadow: 0 0 4px white, 0 0 6px rgba(0,0,0,0.7);
+      ${hasAlerts ? 'animation: pulse 2s infinite;' : ''}
+    "></div>`,
+    className: 'balloon-marker-icon',
+    iconSize: [hasAlerts ? 18 : 14, hasAlerts ? 18 : 14],
+    iconAnchor: [hasAlerts ? 9 : 7, hasAlerts ? 9 : 7]
+  });
 
-          {/* Display NWS Weather Alerts */}
-          {hasAlerts && (
-            <div className="weather-alerts">
-              <h4>Active NWS Alerts:</h4>
-              {alerts.map((alertProps, index) => (
-                // Use alertProps.id or index as key
-                <div key={alertProps.id || index} className="alert-item">
-                  {/* Use fields from NWS properties object */}
-                  <strong>{alertProps.severity || 'Unknown Severity'}:</strong> {alertProps.event || 'Unknown Event'}
-                  <p><small>{alertProps.headline || 'No headline available.'}</small></p>
-                  {/* Optionally add more details like effective/expires times */}
-                   <p><small>Effective: {alertProps.effective ? new Date(alertProps.effective).toLocaleString() : 'N/A'}</small></p>
-                   <p><small>Expires: {alertProps.expires ? new Date(alertProps.expires).toLocaleString() : 'N/A'}</small></p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </Popup>
-    </CircleMarker>
+  return (
+    <>
+      <Marker
+        position={[balloon.currentPosition.lat, balloon.currentPosition.lon]}
+        icon={balloonIcon}
+        key={`marker-${balloon.id}`}
+      >
+        <Popup>
+          <div className="balloon-popup">
+            {/* Balloon Info */}
+            <h3>Balloon #{balloon.id} {hasAlerts ? '⚠️' : ''}</h3>
+            <p>Lat: {balloon.currentPosition.lat.toFixed(4)}</p>
+            <p>Lon: {balloon.currentPosition.lon.toFixed(4)}</p>
+            <p>Alt: {balloon.currentPosition.alt?.toFixed(2) ?? 'N/A'} km</p>
+            <p>FL: {Math.max(0, Math.round((balloon.currentPosition.alt * 328.084))).toString().padStart(3, "0") ?? 'N/A'}</p>
+            <p>Dist (24h): {balloon.totalDistance ? balloon.totalDistance.toFixed(0) : 'N/A'} km</p>
+            <p>
+              Last updated: <br />
+              <span className="timestamp">{balloon.currentPosition.timestamp?.toLocaleString() ?? 'N/A'}</span>
+            </p>
+
+            {/* Display NWS Weather Alerts */}
+            {hasAlerts && (
+              <div className="weather-alerts">
+                <h4>Active NWS Alerts:</h4>
+                {alerts.map((alertProps, index) => (
+                  <div key={alertProps.id || index} className="alert-item">
+                    <strong>{alertProps.severity || 'Unknown Severity'}:</strong> {alertProps.event || 'Unknown Event'}
+                    <p><small>{alertProps.headline || 'No headline available.'}</small></p>
+                    <p><small>Effective: {alertProps.effective ? new Date(alertProps.effective).toLocaleString() : 'N/A'}</small></p>
+                    <p><small>Expires: {alertProps.expires ? new Date(alertProps.expires).toLocaleString() : 'N/A'}</small></p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Popup>
+      </Marker>
+    </>
   );
 }
 
@@ -502,9 +516,9 @@ function MapInteractionHandler({ balloons, setError }) {
  * Renders the main application UI.
  */
 function App() {
-  // *** UPDATED: Set initial view to Continental US ***
-  const position = [39.8283, -98.5795]; // Center of Continental US (approx)
-  const zoom = 4; // Zoom level to fit most of the US
+  // *** UPDATED: Better center of Continental US and optimal zoom ***
+  const position = [38.5, -98.0]; // Slightly adjusted center of Continental US
+  const zoom = 4.5; // Better zoom level to focus on USA
 
   const [balloons, setBalloons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -779,12 +793,24 @@ function App() {
         <div className="legend-section">
             <h4>Weather Alerts</h4>
              <div className="legend-item">
-                <span className="legend-color-box" style={{ backgroundColor: 'rgba(255, 165, 0, 0.2)', border: '1px solid red' }}></span>
-                <span>NWS Alert Area</span>
+                <span className="legend-color-box" style={{ backgroundColor: 'rgba(255, 0, 0, 0.25)', border: '2px solid #800000' }}></span>
+                <span>Extreme Alert</span>
+            </div>
+             <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'rgba(255, 100, 0, 0.25)', border: '2px solid #cc5500' }}></span>
+                <span>Severe Alert</span>
+            </div>
+             <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'rgba(255, 165, 0, 0.25)', border: '2px solid #cc8800' }}></span>
+                <span>Moderate Alert</span>
+            </div>
+             <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'rgba(255, 255, 0, 0.2)', border: '2px solid #aaaa00' }}></span>
+                <span>Minor Alert</span>
             </div>
              <div className="legend-item">
                  <span>⚠️</span> 
-                 <span style={{ marginLeft: '8px'}}>Balloon within Alert Area</span>
+                 <span style={{ marginLeft: '8px'}}>Balloon in Alert Area</span>
              </div>
         </div>
         {/* --- END LEGENDS --- */}

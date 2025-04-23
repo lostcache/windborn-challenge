@@ -278,3 +278,54 @@
   border: 1px solid #ccc;
   flex-shrink: 0;
 }
+
+/* Add pulsing animation for alert markers */
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.7);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 165, 0, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 165, 0, 0);
+  }
+}
+
+/* Styles for balloon marker icons */
+.balloon-marker-icon {
+  display: block;
+}
+
+/* Severity color classes for alert polygons */
+.alert-extreme {
+  fill: rgba(255, 0, 0, 0.25);
+  stroke: #800000;
+  stroke-width: 2;
+}
+
+.alert-severe {
+  fill: rgba(255, 100, 0, 0.25);
+  stroke: #cc5500;
+  stroke-width: 2;
+}
+
+.alert-moderate {
+  fill: rgba(255, 165, 0, 0.25);
+  stroke: #cc8800;
+  stroke-width: 1.5;
+}
+
+.alert-minor {
+  fill: rgba(255, 255, 0, 0.2);
+  stroke: #aaaa00;
+  stroke-width: 1.5;
+}
+
+.alert-unknown {
+  fill: rgba(128, 128, 128, 0.2);
+  stroke: #555555;
+  stroke-width: 1;
+}
