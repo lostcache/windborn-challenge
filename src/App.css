@@ -1,11 +1,19 @@
 .App {
   text-align: center;
   position: relative;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
 }
 
 /* Map styles */
 .map-container {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  height: 100%;
+  width: 100%;
 }
 
 .reset-view-button {
@@ -16,7 +24,7 @@
   background-color: white;
   border-radius: 4px;
   padding: 6px 10px;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
   cursor: pointer;
   font-size: 12px;
   font-weight: bold;
@@ -27,7 +35,7 @@
 .reset-view-button:hover {
   background-color: #f4f4f4;
   transform: scale(1.05);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* Loading overlay */
@@ -67,8 +75,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error message */
@@ -88,89 +101,117 @@
 /* Info panel */
 .info-panel {
   position: absolute;
-  bottom: 20px;
+  bottom: 40px;
   left: 20px;
-  background-color: white;
+  background-color: rgba(255, 255, 255, 0.95);
   padding: 15px;
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   z-index: 1000;
-  text-align: left;
   max-width: 300px;
-  overflow: auto;
+  text-align: left;
+  font-size: 0.9em;
   max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .info-panel h2 {
   margin-top: 0;
-  font-size: 1.2rem;
+  font-size: 1.2em;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+  margin-bottom: 10px;
+}
+
+.info-panel p {
+  margin: 5px 0;
+}
+
+.info-panel strong {
+  font-weight: bold;
 }
 
 .info-panel .last-refreshed {
-  font-size: 0.9rem;
-  color: #666;
-  margin-top: 8px;
+  font-size: 0.8em;
+  color: #555;
+  margin-top: 10px;
 }
 
 .info-panel .data-note {
-  font-size: 0.8rem;
-  color: #888;
-  font-style: italic;
-  margin-top: 5px;
+  font-size: 0.8em;
+  color: #777;
+  margin-top: 10px;
 }
 
 /* Time filter styles */
 .time-filter {
-  margin: 10px 0;
+  margin-top: 15px;
 }
 
 .time-filter label {
   display: block;
   margin-bottom: 5px;
-  font-size: 0.9rem;
-  color: #555;
 }
 
-.time-filter input {
+.time-filter input[type="range"] {
   width: 100%;
-  margin-top: 5px;
 }
 
 /* Path direction marker */
 .path-start-marker {
-  color: #000;
-  font-size: 14px;
-  text-shadow: 1px 1px 2px #fff, -1px -1px 2px #fff, 1px -1px 2px #fff, -1px 1px 2px #fff;
-  text-align: center;
-  line-height: 20px;
-  font-weight: bold;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  border: 1px solid white;
 }
 
 /* Balloon popup styling */
-.balloon-popup h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  color: #2c3e50;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 5px;
-}
-
-.balloon-popup p {
-  margin: 5px 0;
+.balloon-popup {
+  max-width: 250px;
   font-size: 0.9rem;
 }
 
-.balloon-popup p:last-child {
-  margin-top: 10px;
-  font-size: 0.85rem;
-  color: #7f8c8d;
-  margin-bottom: 0;
+.balloon-popup h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.balloon-popup p {
+  margin: 3px 0;
 }
 
 .balloon-popup .timestamp {
-  font-family: monospace;
-  color: #34495e;
-  word-break: break-word;
+  font-size: 0.8em;
+  color: #333;
+}
+
+.weather-alerts {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #ccc;
+}
+
+.weather-alerts h4 {
+  margin-top: 0;
+  margin-bottom: 5px;
+  font-size: 1rem;
+  color: #cc6600;
+}
+
+.alert-item {
+  margin-bottom: 8px;
+  padding-left: 5px;
+  border-left: 3px solid orange;
+}
+
+.alert-item p {
+  margin: 2px 0;
+}
+
+.alert-item small {
+  color: #555;
+  font-size: 0.85em;
 }
 
 /* Legacy styles kept for reference */
@@ -204,7 +245,36 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Legend Styles */
+.legend-section {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+.legend-section h4 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1em;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 0.85em;
+}
+
+.legend-color-box {
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  border: 1px solid #ccc;
+  flex-shrink: 0;
 }

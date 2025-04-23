@@ -12,6 +12,8 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
+import NWSAlertsLayer from './NWSAlertsLayer';
+
 import L from "leaflet";
 delete L.Icon.Default.prototype._getIconUrl;
 
@@ -96,6 +98,118 @@ async function fetchHourlyData(hour, allBalloonHistories) {
     return true;
   }
   return false;
+}
+
+/**
+ * Fetches NWS alerts - fetches all active alerts nationally.
+ * @returns {Promise<object|null>} - Promise resolving to the full FeatureCollection or null if error.
+ */
+async function fetchNWSAlerts(useProxy = false) {
+  const USE_PROXY = useProxy; // Set to true to use proxy, false to use direct API call
+  
+  if (USE_PROXY) {
+    console.log("Fetching all active NWS alerts via proxy...");
+  } else {
+    console.log("Fetching all active NWS alerts directly...");
+  }
+  
+  // Choose URL based on the proxy setting
+  const directUrl = `https://api.weather.gov/alerts/active`;
+  const proxyUrl = `/weather-api/alerts/active`; // New proxy endpoint
+  
+  const url = USE_PROXY ? proxyUrl : directUrl;
+  
+  // Headers - for direct requests we need to set them, proxy will add them
+  const headers = USE_PROXY ? {} : {
+    'User-Agent': '(Windborne Balloon Tracker, learning project)',
+    'Accept': 'application/geo+json'
+  };
+
+  const fetchTimeout = 20000;
+
+  try {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : { signal: null, abort: () => {} };
+    const timeoutId = setTimeout(() => controller.abort(), fetchTimeout);
+
+    console.log("Sending fetch request to:", url);
+    const response = await fetch(url, { 
+      headers: headers, 
+      signal: controller.signal,
+      mode: 'cors' // Explicitly set CORS mode
+    }).finally(() => clearTimeout(timeoutId));
+
+    console.log("Response received:", {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries([...response.headers.entries()]),
+      url: response.url,
+      redirected: response.redirected,
+      type: response.type
+    });
+
+    if (!response.ok) {
+      console.warn(`Failed to fetch alerts: ${response.status} ${response.statusText}`);
+      
+      // If proxy failed, try direct as fallback
+      if (USE_PROXY) {
+        console.log("Proxy request failed, falling back to direct API call...");
+        return fetchNWSAlerts(false); // Retry with direct API
+      }
+      
+      return null;
+    }
+
+    // Clone the response before reading it
+    const clonedResponse = response.clone();
+    
+    try {
+      // Try to get the raw response text for debugging
+      const responseText = await clonedResponse.text();
+      console.log("Raw response text length:", responseText.length);
+      console.log("Raw response text (first 500 chars):", responseText.substring(0, 500));
+      
+      // Parse as JSON from the original response
+      const data = await response.json();
+      console.log("Parsed JSON data available:", !!data);
+      
+      // Basic check for FeatureCollection format
+      if (data && data.type === 'FeatureCollection' && Array.isArray(data.features)) {
+        console.log(`Successfully fetched ${data.features.length} active alerts.`);
+        console.log("First 3 alert features:", data.features.slice(0, 3)); 
+        return data; // Return the full FeatureCollection
+      } else {
+        console.warn(`Unexpected response format:`, data);
+        
+        // If proxy gave bad format, try direct as fallback
+        if (USE_PROXY) {
+          console.log("Proxy returned unexpected format, falling back to direct API call...");
+          return fetchNWSAlerts(false); // Retry with direct API
+        }
+        
+        return null;
+      }
+    } catch (parseError) {
+      console.error("Error parsing response:", parseError);
+      
+      // If proxy response couldn't be parsed, try direct as fallback
+      if (USE_PROXY) {
+        console.log("Failed to parse proxy response, falling back to direct API call...");
+        return fetchNWSAlerts(false); // Retry with direct API
+      }
+      
+      return null;
+    }
+  } catch (fetchError) {
+    console.error("Network error fetching alerts:", fetchError);
+    
+    // If proxy network error, try direct as fallback
+    if (USE_PROXY) {
+      console.log("Proxy network error, falling back to direct API call...");
+      return fetchNWSAlerts(false); // Retry with direct API
+    }
+    
+    return null;
+  }
 }
 
 /**
@@ -228,29 +342,68 @@ function MapController() {
 
 /**
  * Renders a balloon's current position marker and popup.
- * @param {{ balloon: object, markerColor: string }} props
+ * @param {{ balloon: object, markerColor: string, alerts: Array<object> }} props
  */
-function BalloonMarker({ balloon, markerColor }) {
+function BalloonMarker({ balloon, markerColor, alerts }) {
   if (!balloon.currentPosition) return null;
+
+  if(alerts) {
+      console.log(`BalloonMarker (${balloon.id}): Received alerts prop:`, alerts);
+  }
+
+  // Check if the passed 'alerts' prop (which is now an array of NWS properties) is non-empty
+  const hasAlerts = alerts && Array.isArray(alerts) && alerts.length > 0;
+  const alertColor = 'orange';
+  const finalMarkerColor = hasAlerts ? alertColor : markerColor;
+  const markerRadius = hasAlerts ? 7 : 5;
+
+  if(hasAlerts) {
+      console.log(`BalloonMarker (${balloon.id}): Rendering WITH alert indicators.`);
+  }
 
   return (
     <CircleMarker
       center={[balloon.currentPosition.lat, balloon.currentPosition.lon]}
-      pathOptions={{ color: markerColor, fillColor: markerColor, fillOpacity: 0.8, weight: 1 }}
-      radius={5}
+      pathOptions={{
+        color: finalMarkerColor,
+        fillColor: finalMarkerColor,
+        fillOpacity: 0.8,
+        weight: 1
+      }}
+      radius={markerRadius}
+      key={balloon.id}
     >
       <Popup>
         <div className="balloon-popup">
-          <h3>Balloon #{balloon.id}</h3>
+          {/* Balloon Info */}
+          <h3>Balloon #{balloon.id} {hasAlerts ? '⚠️' : ''}</h3>
           <p>Lat: {balloon.currentPosition.lat.toFixed(4)}</p>
           <p>Lon: {balloon.currentPosition.lon.toFixed(4)}</p>
-          <p>Alt: {balloon.currentPosition.alt.toFixed(2)} km</p>
-          <p>FL: {Math.max(0, Math.round((balloon.currentPosition.alt * 3.28084) / 100)).toString().padStart(3, "0")}</p>
+          <p>Alt: {balloon.currentPosition.alt?.toFixed(2) ?? 'N/A'} km</p>
+          <p>FL: {Math.max(0, Math.round((balloon.currentPosition.alt * 328.084))).toString().padStart(3, "0") ?? 'N/A'}</p>
           <p>Dist (24h): {balloon.totalDistance ? balloon.totalDistance.toFixed(0) : 'N/A'} km</p>
           <p>
             Last updated: <br />
-            <span className="timestamp">{balloon.currentPosition.timestamp.toLocaleString()}</span>
+            <span className="timestamp">{balloon.currentPosition.timestamp?.toLocaleString() ?? 'N/A'}</span>
           </p>
+
+          {/* Display NWS Weather Alerts */}
+          {hasAlerts && (
+            <div className="weather-alerts">
+              <h4>Active NWS Alerts:</h4>
+              {alerts.map((alertProps, index) => (
+                // Use alertProps.id or index as key
+                <div key={alertProps.id || index} className="alert-item">
+                  {/* Use fields from NWS properties object */}
+                  <strong>{alertProps.severity || 'Unknown Severity'}:</strong> {alertProps.event || 'Unknown Event'}
+                  <p><small>{alertProps.headline || 'No headline available.'}</small></p>
+                  {/* Optionally add more details like effective/expires times */}
+                   <p><small>Effective: {alertProps.effective ? new Date(alertProps.effective).toLocaleString() : 'N/A'}</small></p>
+                   <p><small>Expires: {alertProps.expires ? new Date(alertProps.expires).toLocaleString() : 'N/A'}</small></p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Popup>
     </CircleMarker>
@@ -312,66 +465,214 @@ function BalloonPath({ balloonId, segments, totalDistance, maxDistance, averageD
 }
 
 /**
- * Renders a marker at the start of the oldest visible path segment.
- * @param {{ balloonId: string, segments: Array<Array<[number, number]>> }} props
+ * Component to handle map interactions like geolocation.
+ * @param {{ balloons: Array, setError: Function }} props
  */
-function PathStartMarker({ balloonId, segments }) {
-  if (segments.length === 0) return null;
+function MapInteractionHandler({ balloons, setError }) {
+  const map = useMap();
 
-  const oldestSegment = segments[segments.length - 1];
-  if (!oldestSegment || oldestSegment.length === 0) return null;
+  // Effect for initial geolocation ONLY (now just logs, doesn't flyTo)
+  useEffect(() => {
+    if (!map) return;
+    console.log("MapInteractionHandler: Map instance available.", map);
+    if (!navigator.geolocation) {
+      console.warn("MapInteractionHandler: Geolocation is not supported.");
+      return;
+    }
+    console.log("MapInteractionHandler: Checking geolocation permission...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        // *** REMOVED map.flyTo ***
+        console.log(`MapInteractionHandler: Geolocation allowed: [${latitude.toFixed(4)}, ${longitude.toFixed(4)}]`);
+        // map.flyTo([latitude, longitude], 10); 
+        // console.log("MapInteractionHandler: map.flyTo called."); 
+      },
+      (error) => {
+        console.warn(`MapInteractionHandler: Geolocation failed or denied: ${error.message}.`);
+      },
+      { timeout: 10000 }
+    );
+  }, [map]); // Dependency array is correct
 
-  const startPoint = oldestSegment[oldestSegment.length - 1];
-
-  if (!startPoint || !Array.isArray(startPoint) || startPoint.length !== 2) return null;
-
-  return (
-    <Marker
-      key={`path-marker-${balloonId}`}
-      position={startPoint}
-      title={`Flight path origin for balloon #${balloonId}`}
-      icon={L.divIcon({ className: "path-start-marker", html: "", iconSize: [18, 18], iconAnchor: [9, 9] })}
-    />
-  );
+  return null;
 }
 
 /**
  * Renders the main application UI.
  */
 function App() {
-  const position = [0, 0];
-  const zoom = 2;
+  // *** UPDATED: Set initial view to Continental US ***
+  const position = [39.8283, -98.5795]; // Center of Continental US (approx)
+  const zoom = 4; // Zoom level to fit most of the US
 
   const [balloons, setBalloons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [timeFilter, setTimeFilter] = useState(24);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [balloonAlerts, setBalloonAlerts] = useState({});
+  const [allNwsAlertData, setAllNwsAlertData] = useState(null);
 
-  const fetchData = useCallback(() => {
+  const fetchBalloonData = useCallback(() => {
     fetchAndProcessBalloonData(setBalloons, setLoading, setError, setLastRefreshed);
   }, []);
 
   useEffect(() => {
-    fetchData();
-    const intervalId = setInterval(fetchData, 60 * 60 * 1000);
+    fetchBalloonData();
+    const intervalId = setInterval(fetchBalloonData, 60 * 60 * 1000);
     return () => clearInterval(intervalId);
-  }, [fetchData]);
+  }, [fetchBalloonData]);
 
-  const totalDistanceAllBalloons = balloons.reduce((sum, b) => sum + (b.totalDistance || 0), 0);
-  const averageDistance = balloons.length > 0 ? totalDistanceAllBalloons / balloons.length : 0;
-  const maxDistance = balloons.length > 0 ? balloons[0].maxDistance : 0;
-
+  const averageDistance = balloons.length > 0 
+    ? balloons.reduce((sum, b) => sum + (b.totalDistance || 0), 0) / balloons.length 
+    : 0;
+  const maxDistance = balloons.reduce((max, b) => Math.max(max, b.totalDistance || 0), 0);
   const visiblePathCount = balloons.filter((b) => {
     const cutoffTime = new Date(Date.now() - timeFilter * 60 * 60 * 1000);
-    return b.positions.filter((pos) => pos.timestamp >= cutoffTime).length > 1;
+    return b.positions && b.positions.length > 1 && b.positions.some(pos => pos.timestamp >= cutoffTime);
   }).length;
+
+  const getAlertsForBalloon = useCallback(async (balloon, allAlerts) => {
+      if (!balloon || !balloon.currentPosition || !allAlerts || !allAlerts.features) {
+          console.log(`getAlertsForBalloon (${balloon?.id}): Returning null early. Missing balloon, position, or alerts data.`);
+          return null;
+      }
+      
+      const { lat, lon } = balloon.currentPosition;
+      
+      // Ensure lat/lon are valid numbers
+      if (typeof lat !== 'number' || typeof lon !== 'number' || !isFinite(lat) || !isFinite(lon)) {
+          console.warn(`getAlertsForBalloon (${balloon.id}): Invalid coordinates: (${lat}, ${lon})`);
+          return null;
+      }
+
+      console.log(`getAlertsForBalloon (${balloon.id}): Checking position [${lat.toFixed(4)}, ${lon.toFixed(4)}] against ${allAlerts.features.length} alerts.`);
+      
+      // Filter alerts by checking if the balloon's position is within each alert's geometry
+      const relevantAlerts = allAlerts.features.filter(feature => {
+          // Skip if no valid geometry
+          if (!feature.geometry || feature.geometry.type !== 'Polygon' || !feature.geometry.coordinates || !Array.isArray(feature.geometry.coordinates[0])) {
+              // console.log(`getAlertsForBalloon (${balloon.id}): Skipping alert ${feature.properties?.id} due to invalid/missing Polygon geometry.`); 
+              // Note: Commented out by default to avoid excessive logging if many alerts lack geometry
+              return false;
+          }
+          
+          try {
+              const coordinates = feature.geometry.coordinates[0]; // Get the outer ring
+              
+              // Ray casting algorithm to check if point is in polygon
+              let inside = false;
+              for (let i = 0, j = coordinates.length - 1; i < coordinates.length; j = i++) {
+                  const xi = coordinates[i][0], yi = coordinates[i][1];
+                  const xj = coordinates[j][0], yj = coordinates[j][1];
+                  
+                  // Basic check for valid coordinate pairs
+                  if (typeof xi !== 'number' || typeof yi !== 'number' || typeof xj !== 'number' || typeof yj !== 'number') {
+                    console.warn(`getAlertsForBalloon (${balloon.id}): Invalid coordinate pair found in polygon for alert ${feature.properties?.id}`);
+                    return false; // Skip this polygon if coordinates are bad
+                  }
+
+                  const intersect = ((yi > lat) !== (yj > lat)) &&
+                      (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+                  if (intersect) inside = !inside;
+              }
+              
+              // *** ADDED LOG: Log result of point-in-polygon check ***
+              if (inside) {
+                console.log(`getAlertsForBalloon (${balloon.id}): MATCH FOUND! Position is inside alert ${feature.properties?.event} (${feature.properties?.id})`);
+              } 
+              // else { 
+              //   console.log(`getAlertsForBalloon (${balloon.id}): Position NOT inside alert ${feature.properties?.event} (${feature.properties?.id})`); 
+              // } // Note: Commented out 'not inside' log to reduce noise
+              return inside;
+          } catch (e) {
+              console.warn(`Error checking if balloon ${balloon.id} is in alert area for alert ${feature.properties?.id}:`, e);
+              return false;
+          }
+      });
+      
+      // *** ADDED LOG: Log the number of relevant alerts found ***
+      console.log(`getAlertsForBalloon (${balloon.id}): Found ${relevantAlerts.length} relevant alerts.`);
+      
+      // Return just the properties of matching alerts
+      return relevantAlerts.length > 0 ? relevantAlerts.map(f => f.properties) : null;
+  }, []);
+
+  // Effect to fetch alerts for all balloons
+  useEffect(() => {
+    async function fetchAndProcessAlerts() {
+      if (!balloons.length) return;
+      
+      setAlertsLoading(true);
+      console.log("Starting fetchAndProcessAlerts...");
+      
+      try {
+        // Try with proxy first (true), which will fall back to direct if needed
+        const allAlertsData = await fetchNWSAlerts(true);
+        
+        // *** ADDED: Store the fetched data in state ***
+        setAllNwsAlertData(allAlertsData);
+        
+        console.log("Fetched allAlertsData:", allAlertsData ? `${allAlertsData.features?.length} features` : 'null or undefined');
+
+        if (!allAlertsData) {
+          console.error("Failed to fetch alerts after both proxy and direct attempts");
+          setAlertsLoading(false);
+          return;
+        }
+        
+        // Process alerts for each balloon
+        const newAlerts = {};
+        
+        // *** Using map and Promise.all for potentially better performance ***
+        const alertPromises = balloons.map(async (balloon) => {
+          if (!balloon.currentPosition) return; // Skip if no position
+          
+          try {
+            const alerts = await getAlertsForBalloon(balloon, allAlertsData);
+            if (alerts) {
+              console.log(`Alerts found for balloon ${balloon.id}:`, alerts);
+              newAlerts[balloon.id] = alerts;
+            }
+          } catch (error) {
+            console.error(`Error processing alerts for balloon ${balloon.id}:`, error);
+          }
+        });
+        
+        await Promise.all(alertPromises);
+
+        console.log("Setting balloonAlerts state with:", newAlerts);
+        setBalloonAlerts(newAlerts);
+
+      } catch (error) {
+        console.error("Error in fetchAndProcessAlerts:", error);
+      } finally {
+        setAlertsLoading(false);
+        console.log("Finished fetchAndProcessAlerts.");
+      }
+    }
+    
+    fetchAndProcessAlerts();
+    // Refresh alerts every 15 minutes
+    const intervalId = setInterval(fetchAndProcessAlerts, 15 * 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [balloons, getAlertsForBalloon, setAllNwsAlertData]);
 
   return (
     <div className="App">
       <div className="map-container" style={{ height: "100vh", width: "100%" }}>
-        {/* Loading and Error indicators */}
-        {loading && <div className="loading-overlay"><div className="loading-spinner">Loading...</div></div>}
+        {(loading || alertsLoading) && (
+            <div className="loading-overlay">
+                <div className="loading-spinner">
+                    Loading {loading ? 'balloon data' : ''}
+                    {loading && alertsLoading ? ' and ' : ''}
+                    {alertsLoading ? 'NWS alerts...' : ''}
+                    {!loading && !alertsLoading ? '...' : ''}
+                </div>
+            </div>
+        )}
         {error && <div className="error-message">{error}</div>}
 
         <MapContainer
@@ -387,47 +688,50 @@ function App() {
           <ZoomControl position="topright" />
           <MapController />
 
+          <MapInteractionHandler balloons={balloons} setError={setError} />
+
+          {allNwsAlertData && <NWSAlertsLayer allAlerts={allNwsAlertData} />}
+
           {balloons.map((balloon) => {
-             // Calculate Hue based on distance relative to average (Blue-Green-Red)
              let hue;
              const totalDistance = balloon.totalDistance || 0;
              const saturation = 80;
              const lightness = 50;
-
-             if (averageDistance <= 0) {
-               hue = 120; // Default Green
-             } else if (totalDistance <= averageDistance) {
-               const ratio = totalDistance / averageDistance;
-               hue = 240 - ratio * (240 - 120);
-             } else {
+             if (averageDistance <= 0 || !isFinite(averageDistance)) { hue = 120; }
+             else if (totalDistance <= averageDistance) { hue = 240 - (totalDistance / averageDistance) * 120; }
+             else {
                const rangeAboveAverage = maxDistance - averageDistance;
-               if (rangeAboveAverage <= 0) {
-                 hue = 120; // Green
-               } else {
-                 const distanceAboveAverage = totalDistance - averageDistance;
-                 const ratio = Math.min(distanceAboveAverage / rangeAboveAverage, 1);
-                 hue = 120 - ratio * 120;
-               }
+               if (rangeAboveAverage <= 0 || !isFinite(rangeAboveAverage)) { hue = 120; }
+               else { hue = 120 - Math.min((totalDistance - averageDistance) / rangeAboveAverage, 1) * 120; }
              }
              const markerColor = `hsl(${hue.toFixed(0)}, ${saturation}%, ${lightness}%)`;
 
-            // Filter and sort positions for path
+            // Use pre-fetched alerts from state instead of calling getAlertsForBalloon directly
+            const alertsForBalloon = balloonAlerts[balloon.id] || null;
+
             const cutoffTime = new Date(Date.now() - timeFilter * 60 * 60 * 1000);
-            const filteredPositions = balloon.positions.filter((pos) => pos.timestamp >= cutoffTime);
-            filteredPositions.sort((a, b) => a.timestamp - b.timestamp);
+            const filteredPositions = (balloon.positions || [])
+               .filter((pos) => pos.timestamp >= cutoffTime);
             const pathSegments = splitPathSegments(filteredPositions);
 
             return (
               <React.Fragment key={balloon.id}>
-                <BalloonMarker balloon={balloon} markerColor={markerColor} />
-                <BalloonPath
-                  balloonId={balloon.id}
-                  segments={pathSegments}
-                  totalDistance={totalDistance}
-                  maxDistance={maxDistance || 0}
-                  averageDistance={averageDistance || 0} // Pass average distance again
-                />
-                {pathSegments.length > 0 && pathSegments[0].length > 0 && <PathStartMarker balloonId={balloon.id} segments={pathSegments} />}
+                {balloon.currentPosition && (
+                    <BalloonMarker
+                        balloon={balloon}
+                        markerColor={markerColor}
+                        alerts={alertsForBalloon}
+                    />
+                )}
+                {pathSegments.length > 0 && (
+                    <BalloonPath
+                      balloonId={balloon.id}
+                      segments={pathSegments}
+                      totalDistance={totalDistance}
+                      maxDistance={maxDistance}
+                      averageDistance={averageDistance}
+                    />
+                )}
               </React.Fragment>
             );
           })}
@@ -437,9 +741,9 @@ function App() {
       <div className="info-panel">
         <h2>Windborne Systems Balloon Constellation</h2>
         <p>Total balloons: <strong>{balloons.length}</strong></p>
-        <p>Visible paths: {visiblePathCount}</p>
-        <p>Avg Distance (24h): {averageDistance.toFixed(0)} km</p>
-        <p>Max Distance (24h): {maxDistance.toFixed(0)} km</p>
+        <p>Visible paths ({timeFilter}h): {visiblePathCount}</p>
+        <p>Avg Distance (24h): {isFinite(averageDistance) ? averageDistance.toFixed(0) : 'N/A'} km</p>
+        <p>Max Distance (24h): {isFinite(maxDistance) ? maxDistance.toFixed(0) : 'N/A'} km</p>
 
         <div className="time-filter">
           <label htmlFor="time-range">Path history: {timeFilter} hours</label>
@@ -450,13 +754,45 @@ function App() {
             max="24"
             value={timeFilter}
             onChange={(e) => setTimeFilter(parseInt(e.target.value, 10))}
+            aria-labelledby="time-range-label"
           />
+          <span id="time-range-label" style={{ display: "none" }}>Path history duration</span>
         </div>
 
+        {/* --- START LEGENDS --- */} 
+        <div className="legend-section">
+            <h4>Balloon Path Color</h4>
+            <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'hsl(240, 80%, 50%)' }}></span>
+                <span>Shortest Distance (relative)</span>
+            </div>
+             <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'hsl(120, 80%, 50%)' }}></span>
+                <span>Average Distance</span>
+            </div>
+             <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'hsl(0, 80%, 50%)' }}></span>
+                <span>Longest Distance (relative)</span>
+            </div>
+        </div>
+
+        <div className="legend-section">
+            <h4>Weather Alerts</h4>
+             <div className="legend-item">
+                <span className="legend-color-box" style={{ backgroundColor: 'rgba(255, 165, 0, 0.2)', border: '1px solid red' }}></span>
+                <span>NWS Alert Area</span>
+            </div>
+             <div className="legend-item">
+                 <span>⚠️</span> 
+                 <span style={{ marginLeft: '8px'}}>Balloon within Alert Area</span>
+             </div>
+        </div>
+        {/* --- END LEGENDS --- */}
+
         {lastRefreshed && (
-          <p className="last-refreshed">Last refreshed: {lastRefreshed.toLocaleTimeString()}</p>
+          <p className="last-refreshed">Balloon data refreshed: {lastRefreshed.toLocaleTimeString()}</p>
         )}
-        <p className="data-note">Data auto-refreshes every hour</p>
+        <p className="data-note">Balloon data auto-refreshes hourly. NWS alerts refresh every 15 mins.</p>
       </div>
     </div>
   );
